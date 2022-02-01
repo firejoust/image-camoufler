@@ -1,6 +1,7 @@
 use std::{env, str};
-use std::path::{PathBuf};
-use image::{RgbaImage};
+use std::path::PathBuf;
+use image::RgbaImage;
+use rand::Rng;
 
 // debug messages
 const USAGE: &'static str = "Usage: camoufler <input_image> <output_folder> [<arguments>]";
@@ -14,12 +15,11 @@ fn main() {
     // initialise argument values
     let mut input_path_raw = String::new();
     let mut output_path_raw = String::new();
-    let mut smudge_weight: u8 = 0;
+    let mut smudge_weight: u8 = 1;
     let mut smudge_shade: bool = false;
-    let mut smudge_range: [u32; 2] = [0, 65535];
 
     // modify misc argument values
-    match read_args(&mut smudge_weight, &mut smudge_shade, &mut smudge_range, &mut input_path_raw, &mut output_path_raw) {
+    match read_args(&mut smudge_weight, &mut smudge_shade, &mut input_path_raw, &mut output_path_raw) {
         Ok(_) => {},
         Err(e) => {
             println!("ERROR whilst reading arguments: {}\n{}", e, USAGE);
@@ -57,7 +57,6 @@ fn main() {
     */
 
     let mut input_image: RgbaImage;
-    let smudge_rgb_range = parse_rgb(smudge_range);
 
     // verify that a valid image has been specified
     match image::open(input_path) {
@@ -70,15 +69,19 @@ fn main() {
         }
     }
 
-    smudge_image(&mut input_image, &smudge_weight, &smudge_shade, smudge_rgb_range);
-    println!("{:?}", output_path);
+    smudge_image(&mut input_image, &smudge_weight, &smudge_shade);
+    let status = image::save_buffer(output_path.join("output.png"), &input_image, input_image.width(), input_image.height(), image::ColorType::Rgba8);
+    match status {
+        Ok(_) => println!("Successfuly saved output.png to {:?}", output_path),
+        Err(e) => println!("ERROR whilst saving image: {}\n{}", e, USAGE)
+    }
 }
 
 /*
 **  ARGUMENT HANDLERS
 */
 
-fn read_args(smudge_weight: &mut u8, smudge_shade: &mut bool, smudge_range: &mut [u32; 2], input_path: &mut String, output_path: &mut String) -> Result<bool, String> {
+fn read_args(smudge_weight: &mut u8, smudge_shade: &mut bool, input_path: &mut String, output_path: &mut String) -> Result<bool, String> {
 
     // construct values from arguments
     let args: Vec<String> = env::args().collect();
@@ -114,26 +117,14 @@ fn read_args(smudge_weight: &mut u8, smudge_shade: &mut bool, smudge_range: &mut
                 return Err::<bool, String>(msg);
             }
             
-            else if arg.eq("--smudge-weight") || arg.eq("-s") {
-                *smudge_weight = parse_arg(&args[arg_value_ref], 5);
+            else if arg.eq("--smudge-weight") || arg.eq("-w") {
+                *smudge_weight = parse_arg(&args[arg_value_ref], 1);
                 start += 2;
                 break;
             }
 
-            else if arg.eq("--smudge-shade") || arg.eq("-t") {
+            else if arg.eq("--smudge-shade") || arg.eq("-s") {
                 *smudge_shade = parse_arg(&args[arg_value_ref], false);
-                start += 2;
-                break;
-            }
-
-            else if arg.eq("--smudge-min") || arg.eq("-m") {
-                (*smudge_range)[0] = parse_arg(&args[arg_value_ref], 0); // 0x000000
-                start += 2;
-                break;
-            }
-
-            else if arg.eq("--smudge-max") || arg.eq("-M") {
-                (*smudge_range)[1] = parse_arg(&args[arg_value_ref], 65535); // 0xffffff
                 start += 2;
                 break;
             }
@@ -202,28 +193,7 @@ fn parse_output_path(path: String) -> Result<PathBuf, &'static str> {
 **  IMAGE HANDLERS
 */
 
-fn parse_rgb(range: [u32; 2]) -> [[u8; 2]; 3] {
-    println!("{}", ((range[0] - 0x00ffff) / 2^16));
-    // isolate 8-bit colour channels from their decimal values
-    let red_raw = [
-        ((range[0] - 0x00ffff) / 2^16) as u8, 
-        ((range[1] - 0x00ffff) / 2^16) as u8
-    ]; // red channel is 0x(ff)ffff;
-
-    let green_raw = [
-        ((range[0] - 0xff00ff) / 2^8) as u8,
-        ((range[1] - 0xff00ff) / 2^8) as u8
-    ]; // green channel is 0xff(ff)ff;
-
-    let blue_raw = [
-        (range[0] - 0xffff00) as u8,
-        (range[1] - 0xffff00) as u8
-    ]; // blue channel is 0xffff(ff);
-
-    [red_raw, green_raw, blue_raw]
-}
-
-fn smudge_image(image: &mut RgbaImage, weight: &u8, shade: &bool, range: [[u8; 2]; 3]) {
+fn smudge_image(image: &mut RgbaImage, weight: &u8, shade: &bool) {
     // determine the maximum value that the image should be smudged
     let smudge: isize = if *shade {
         -1
@@ -235,12 +205,15 @@ fn smudge_image(image: &mut RgbaImage, weight: &u8, shade: &bool, range: [[u8; 2
     for pixel in image.pixels_mut() {
         for i in 0..2 {
             let colour = &mut pixel[i];
-            let smudged = smudge * (*colour as isize);
-            let within_min =  smudged <= (range[i][0] as isize);
-            let within_max = smudged >= (range[i][1] as isize);
-            // colour is within the boundaries of an 8-bit value
-            if within_min && within_max {
-                *colour = smudged as u8;
+            let smudged = rand::thread_rng().gen_range(0..*weight) as isize;
+            let new_colour = *colour as isize + (smudge * smudged);
+            // within u8 range
+            *colour = if new_colour <= 0 {
+                0
+            } else if new_colour >= 255 {
+                255
+            } else {
+                new_colour as u8
             }
         }
     }
