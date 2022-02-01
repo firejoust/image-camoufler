@@ -15,8 +15,8 @@ cd ./target/release
 ## Usage
 `camoufler <input_image> <output_folder> [<arguments>]`, where `input_image` is the path to an encoded image.
 #### Arguments:
-- `--smudge-weight | -w <1-255>` The maximum value for the randomised value
-- `--smudge-shade | -s <true|false>` Changes the sign of the randomised value (true: +, false: -)
+- `--smudge-weight | -w <1-255>` The maximum range of the randomised value
+- `--smudge-shade | -s <true|false>` Changes the sign of the randomised value (true: -, false: +)
 
 ## Preview
 - Randomisation towards `#ffffff` (Shading disabled)
