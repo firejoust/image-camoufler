@@ -10,6 +10,12 @@ git clone https://github.com/firejoust/image-camoufler.git
 cd ./image-camoufler
 cargo build --release
 cd ./target/release
+ls image-camoufler
+```
+- Alternatively, the binary executable can be downloaded directly from the [releases](https://github.com/firejoust/image-camoufler/releases/latest) page.
+```bash
+wget https://github.com/firejoust/image-camoufler/releases/latest/download/camoufler
+ls camoufler
 ```
 
 ## Usage
