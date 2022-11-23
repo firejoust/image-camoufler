@@ -1,6 +1,6 @@
 <div align="center">
 <h1>Camoufler</h1>
-<p><i>An image fingerprinting circumvention tool</i></p>
+<p><i>Image noise generation tool</i></p>
 </div>
 
 ## Installation
@@ -50,6 +50,3 @@ camoufler ./assets/weetbix1 ./assets --smudge-shade true --smudge-weight X # Rep
         <td><img src="assets/weetbix8.png"></td>
     </tr>
 </table>
-
-## Disclaimer
-- Creator not responsible for misuse.
